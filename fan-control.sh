@@ -28,6 +28,9 @@ echo "Running take-control.sh..." | tee -a $DEBUG_LOG
 manage_logs() {
     find $DEBUG_LOG -type f -mmin +60 -exec rm {} \;
 }
+#Initialize control
+echo "Setting fans to manual control" | tee -a $DEBUG_LOG
+$IPMI_COMMAND raw 0x30 0x30 0x01 0x00
 
 # Start an infinite loop to check temperatures and adjust fan speed every 10 seconds
 while true; do
@@ -53,14 +56,16 @@ while true; do
     echo "Max GPU temp: $max_gpu_temp" | tee -a $DEBUG_LOG
 
     # Determine the appropriate fan speed based on GPU temperature thresholds
-    if [ "$max_gpu_temp" -lt 55 ]; then
+    if [ "$max_gpu_temp" -lt $VERY_LOW_TEMP_THRESHOLD ]; then
         fan_speed=$VERY_LOW_FAN_SPEED
-    elif [ "$max_gpu_temp" -lt 65 ]; then
+    elif [ "$max_gpu_temp" -lt $LOW_TEMP_THRESHOLD ]; then
         fan_speed=$LOW_FAN_SPEED
-    elif [ "$max_gpu_temp" -lt 75 ]; then
+    elif [ "$max_gpu_temp" -lt $MID_TEMP_THRESHOLD ]; then
         fan_speed=$MID_FAN_SPEED
-    elif [ "$max_gpu_temp" -lt 85 ]; then
+    elif [ "$max_gpu_temp" -lt $HIGH_TEMP_THRESHOLD ]; then
         fan_speed=$HIGH_FAN_SPEED
+    elif [ "$max_gpu_temp" -lt $VERY_HIGH_TEMP_THRESHOLD ]; then
+        fan_speed=$VERY_HIGH_FAN_SPEED
     else
         echo "ERROR: GPU temperature exceeded 85°C. Activating emergency override!" | systemd-cat -p err
         fan_speed=80
@@ -85,6 +90,6 @@ while true; do
         echo "ERROR: GPU temperature exceeded 85°C while fan speed was mid ($fan_speed%)" | systemd-cat -p err | tee -a $DEBUG_LOG
     fi
 
-    # Wait for 10 seconds before the next check
-    sleep 10
+    # Wait for 5 seconds before the next check
+    sleep 5
 done
